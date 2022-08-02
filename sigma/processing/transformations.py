@@ -61,15 +61,14 @@ class DetectionItemTransformation(Transformation):
         for i, detection_item in enumerate(detection.detection_items):
             if isinstance(detection_item, SigmaDetection):        # recurse into nested detection items
                 self.apply_detection(detection_item)
-            else:
-                if (
+            elif (
                     self.processing_item is None or
                     self.processing_item.match_detection_item(self.pipeline, detection_item)
                  ) and (r := self.apply_detection_item(detection_item)) is not None:
-                    if isinstance(r, SigmaDetectionItem):
-                        r.disable_conversion_to_plain()
-                    detection.detection_items[i] = r
-                    self.processing_item_applied(r)
+                if isinstance(r, SigmaDetectionItem):
+                    r.disable_conversion_to_plain()
+                detection.detection_items[i] = r
+                self.processing_item_applied(r)
 
     def apply(self, pipeline : "sigma.processing.pipeline.ProcessingPipeline", rule : SigmaRule) -> None:
         super().apply(pipeline, rule)
@@ -136,7 +135,7 @@ class ConditionTransformation(Transformation):
     """
     def apply(self, pipeline: "sigma.processing.pipeline.ProcessingPipeline", rule: SigmaRule) -> None:
         super().apply(pipeline, rule)
-        for i, condition in enumerate(rule.detection.parsed_condition):
+        for condition in rule.detection.parsed_condition:
             condition_before = condition.condition
             self.apply_condition(condition)
             if condition.condition != condition_before:               # Condition was changed by transformation,
@@ -157,14 +156,13 @@ class FieldMappingTransformation(DetectionItemTransformation):
     def apply_detection_item(self, detection_item : SigmaDetectionItem):
         if (field_name := detection_item.field) in self.mapping:
             mapping = self.mapping[field_name]
-            if isinstance(mapping, str):    # 1:1 mapping, map field name of detection item directly
-                detection_item.field = self.mapping[field_name]
-                self.processing_item_applied(detection_item)
-            else:
+            if not isinstance(mapping, str):
                 return SigmaDetection([
                     dataclasses.replace(detection_item, field=field)
                     for field in mapping
                 ])
+            detection_item.field = self.mapping[field_name]
+            self.processing_item_applied(detection_item)
 
 @dataclass
 class DropDetectionItemTransformation(DetectionItemTransformation):
@@ -312,12 +310,14 @@ class QueryExpressionPlaceholderTransformation(PlaceholderIncludeExcludeMixin, V
 
     def apply_value(self, field : str, val: SigmaString) -> Union[SigmaString, Iterable[SigmaString]]:
         if val.contains_placeholder():
-            if len(val.s) == 1:     # Sigma string must only contain placeholder, nothing else.
-                p = val.s[0]
-                if self.is_handled_placeholder(p):
-                    return SigmaQueryExpression(self.expression, self.mapping.get(p.name) or p.name)
-            else:       # SigmaString contains placeholder as well as other parts
-                raise SigmaValueError(f"Placeholder query expression transformation only allows placeholder-only strings.")
+            if len(val.s) != 1:
+                raise SigmaValueError(
+                    "Placeholder query expression transformation only allows placeholder-only strings."
+                )
+
+            p = val.s[0]
+            if self.is_handled_placeholder(p):
+                return SigmaQueryExpression(self.expression, self.mapping.get(p.name) or p.name)
         return None
 
 @dataclass

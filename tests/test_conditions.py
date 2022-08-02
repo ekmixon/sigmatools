@@ -6,82 +6,145 @@ from sigma.exceptions import SigmaConditionError
 
 @pytest.fixture
 def sigma_simple_detections():
-    return SigmaDetections({
-        "detection1": SigmaDetection([
-            SigmaDetectionItem(None, [], [SigmaString("val1")]),
-        ]),
-        "detection2": SigmaDetection([
-            SigmaDetectionItem(None, [], [SigmaString("val2")]),
-        ]),
-        "detection3": SigmaDetection([
-            SigmaDetectionItem(None, [], [SigmaString("val3")]),
-        ]),
-        "detection_4": SigmaDetection([
-            SigmaDetectionItem(None, [], [SigmaString("val4")]),
-        ]),
-        "other": SigmaDetection([
-            SigmaDetectionItem(None, [], [SigmaString("other")]),
-        ]),
-    }, list())
+    return SigmaDetections(
+        {
+            "detection1": SigmaDetection(
+                [
+                    SigmaDetectionItem(None, [], [SigmaString("val1")]),
+                ]
+            ),
+            "detection2": SigmaDetection(
+                [
+                    SigmaDetectionItem(None, [], [SigmaString("val2")]),
+                ]
+            ),
+            "detection3": SigmaDetection(
+                [
+                    SigmaDetectionItem(None, [], [SigmaString("val3")]),
+                ]
+            ),
+            "detection_4": SigmaDetection(
+                [
+                    SigmaDetectionItem(None, [], [SigmaString("val4")]),
+                ]
+            ),
+            "other": SigmaDetection(
+                [
+                    SigmaDetectionItem(None, [], [SigmaString("other")]),
+                ]
+            ),
+        },
+        [],
+    )
 
 @pytest.fixture
 def sigma_detections():
-    return SigmaDetections({
-        "keywords": SigmaDetection([        # expected result: OR across values
-            SigmaDetectionItem(None, [], [
-                SigmaString("keyword1"),
-                SigmaNumber(123),
-            ]),
-        ]),
-        "keyword-list": SigmaDetection([    # expected result: OR across values inside a detection item, AND of detection items
-            SigmaDetectionItem(None, [], [
-                SigmaString("keyword1"),
-                SigmaString("keyword2"),
-            ]),
-            SigmaDetectionItem(None, [], [
-                SigmaString("keyword3"),
-                SigmaString("keyword4"),
-            ]),
-        ]),
-        "field-value": SigmaDetection([     # expected result: AND of key=value pairs
-            SigmaDetectionItem("field1", [], [ SigmaString("value1") ]),
-            SigmaDetectionItem("field2", [], [ SigmaNumber(123) ]),
-            SigmaDetectionItem("field3", [], [ SigmaNull() ]),
-        ]),
-        "field-valuelist": SigmaDetection([    # expected result: each key results in "in" expression (or expanded to OR on demand), AND of key-expressions
-            SigmaDetectionItem("field1", [], [
-                SigmaString("value1-1"),
-                SigmaNumber(123),
-            ]),
-            SigmaDetectionItem("field2", [], [
-                SigmaString("value2-1"),
-                SigmaNumber(234),
-            ]),
-        ]),
-        "field-valuelist-wildcards": SigmaDetection([    # expected result: ORed key=value expressions, no "in" expression
-            SigmaDetectionItem("field", [], [
-                SigmaString("simple-value"),
-                SigmaString("*wildcards*"),
-            ]),
-        ]),
-        "field-valuelist-regex": SigmaDetection([    # expected result: ORed key=value expressions, no "in" expression
-            SigmaDetectionItem("field", [], [
-                SigmaString("simple-value"),
-                SigmaRegularExpression("reg.*ex"),
-            ]),
-        ]),
-        "empty-field": SigmaDetection([              # expected result: field match against null value
-            SigmaDetectionItem("field", [], [])
-        ])
-    }, list())
+    return SigmaDetections(
+        {
+            "keywords": SigmaDetection(
+                [  # expected result: OR across values
+                    SigmaDetectionItem(
+                        None,
+                        [],
+                        [
+                            SigmaString("keyword1"),
+                            SigmaNumber(123),
+                        ],
+                    ),
+                ]
+            ),
+            "keyword-list": SigmaDetection(
+                [  # expected result: OR across values inside a detection item, AND of detection items
+                    SigmaDetectionItem(
+                        None,
+                        [],
+                        [
+                            SigmaString("keyword1"),
+                            SigmaString("keyword2"),
+                        ],
+                    ),
+                    SigmaDetectionItem(
+                        None,
+                        [],
+                        [
+                            SigmaString("keyword3"),
+                            SigmaString("keyword4"),
+                        ],
+                    ),
+                ]
+            ),
+            "field-value": SigmaDetection(
+                [  # expected result: AND of key=value pairs
+                    SigmaDetectionItem("field1", [], [SigmaString("value1")]),
+                    SigmaDetectionItem("field2", [], [SigmaNumber(123)]),
+                    SigmaDetectionItem("field3", [], [SigmaNull()]),
+                ]
+            ),
+            "field-valuelist": SigmaDetection(
+                [  # expected result: each key results in "in" expression (or expanded to OR on demand), AND of key-expressions
+                    SigmaDetectionItem(
+                        "field1",
+                        [],
+                        [
+                            SigmaString("value1-1"),
+                            SigmaNumber(123),
+                        ],
+                    ),
+                    SigmaDetectionItem(
+                        "field2",
+                        [],
+                        [
+                            SigmaString("value2-1"),
+                            SigmaNumber(234),
+                        ],
+                    ),
+                ]
+            ),
+            "field-valuelist-wildcards": SigmaDetection(
+                [  # expected result: ORed key=value expressions, no "in" expression
+                    SigmaDetectionItem(
+                        "field",
+                        [],
+                        [
+                            SigmaString("simple-value"),
+                            SigmaString("*wildcards*"),
+                        ],
+                    ),
+                ]
+            ),
+            "field-valuelist-regex": SigmaDetection(
+                [  # expected result: ORed key=value expressions, no "in" expression
+                    SigmaDetectionItem(
+                        "field",
+                        [],
+                        [
+                            SigmaString("simple-value"),
+                            SigmaRegularExpression("reg.*ex"),
+                        ],
+                    ),
+                ]
+            ),
+            "empty-field": SigmaDetection(
+                [  # expected result: field match against null value
+                    SigmaDetectionItem("field", [], [])
+                ]
+            ),
+        },
+        [],
+    )
 
 @pytest.fixture
 def sigma_invalid_detections():
-    return SigmaDetections({
-        "null-keyword": SigmaDetection([
-            SigmaDetectionItem(None, [], []),
-        ]),
-    }, list())
+    return SigmaDetections(
+        {
+            "null-keyword": SigmaDetection(
+                [
+                    SigmaDetectionItem(None, [], []),
+                ]
+            ),
+        },
+        [],
+    )
 
 def test_or(sigma_simple_detections):
     assert SigmaCondition("detection1 or detection2", sigma_simple_detections).parsed == ConditionOR([

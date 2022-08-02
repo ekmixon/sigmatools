@@ -28,10 +28,7 @@ class ProcessingPipelineResolver:
         """Resolve single processing pipeline."""
         try:
             pipeline = self.pipelines[spec]
-            if isinstance(pipeline, Callable):
-                return pipeline()
-            else:
-                return pipeline
+            return pipeline() if isinstance(pipeline, Callable) else pipeline
         except KeyError:        # identifier not found, try it as path
             try:
                 return ProcessingPipeline.from_yaml(open(spec, "r").read())

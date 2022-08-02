@@ -24,17 +24,11 @@ class SigmaModifier(ABC):
         to = get_origin(th)                         # get possible generic type of type hint
         if to is None:                              # Plain type in annotation
             return isinstance(val, th)
-        elif to is Union:                           # type hint is Union of multiple types, check if val is one of them
-            for t in get_args(th):
-                if isinstance(val, t):
-                    return True
-            return False
-        elif to is SequenceABC:                     # type hint is sequence
+        elif to is Union:                   # type hint is Union of multiple types, check if val is one of them
+            return any(isinstance(val, t) for t in get_args(th))
+        elif to is SequenceABC:             # type hint is sequence
             inner_type = get_args(th)[0]
-            return all([
-                self.type_check(item, explicit_type=inner_type)
-                for item in val
-            ])
+            return all(self.type_check(item, explicit_type=inner_type) for item in val)
 
     @abstractmethod
     def modify(self, val : Union[SigmaType, Sequence[SigmaType]]) -> Union[SigmaType, List[SigmaType]]:
@@ -47,7 +41,7 @@ class SigmaModifier(ABC):
         * Ensure returned value is a list
         * Handle values of SigmaExpansion objects separately.
         """
-        if isinstance(val, SigmaExpansion):     # Handle each SigmaExpansion item separately
+        if isinstance(val, SigmaExpansion):
             return [
                 SigmaExpansion([
                     va
@@ -55,14 +49,10 @@ class SigmaModifier(ABC):
                     for va in self.apply(v)
                 ])
             ]
-        else:
-            if not self.type_check(val):
-                raise SigmaTypeError(f"Modifier {self.__class__.__name__} incompatible to value type of '{ val }'", source=self.source)
-            r = self.modify(val)
-            if isinstance(r, List):
-                return r
-            else:
-                return [r]
+        if not self.type_check(val):
+            raise SigmaTypeError(f"Modifier {self.__class__.__name__} incompatible to value type of '{ val }'", source=self.source)
+        r = self.modify(val)
+        return r if isinstance(r, List) else [r]
 
 class SigmaValueModifier(SigmaModifier):
     """Base class for all modifiers that handle each value for the modifier scope separately"""
@@ -87,9 +77,9 @@ class SigmaContainsModifier(SigmaValueModifier):
                 val += SpecialChars.WILDCARD_MULTI
         elif isinstance(val, SigmaRegularExpression):
             if val.regexp[:2] != '.*' and val.regexp[0] != "^":
-                val.regexp = '.*' + val.regexp
+                val.regexp = f'.*{val.regexp}'
             if val.regexp[-2:] != '.*' and val.regexp[-1] != "$":
-                val.regexp = val.regexp + '.*'
+                val.regexp = f'{val.regexp}.*'
             val.compile()
         return val
 
@@ -101,7 +91,7 @@ class SigmaStartswithModifier(SigmaValueModifier):
                 val += SpecialChars.WILDCARD_MULTI
         elif isinstance(val, SigmaRegularExpression):
             if val.regexp[-2:] != '.*' and val.regexp[-1] != "$":
-                val.regexp = val.regexp + '.*'
+                val.regexp = f'{val.regexp}.*'
             val.compile()
         return val
 
@@ -113,7 +103,7 @@ class SigmaEndswithModifier(SigmaValueModifier):
                 val = SpecialChars.WILDCARD_MULTI + val
         elif isinstance(val, SigmaRegularExpression):
             if val.regexp[:2] != '.*' and val.regexp[0] != "^":
-                val.regexp = '.*' + val.regexp
+                val.regexp = f'.*{val.regexp}'
             val.compile()
         return val
 
@@ -149,7 +139,7 @@ class SigmaBase64OffsetModifier(SigmaValueModifier):
 class SigmaWideModifier(SigmaValueModifier):
     """Encode string as wide string (UTF-16LE)."""
     def modify(self, val : SigmaString) -> SigmaString:
-        r = list()
+        r = []
         for item in val.s:
             if isinstance(item, str):       # put 0x00 after each character by encoding it to utf-16le and decoding it as utf-8
                 try:

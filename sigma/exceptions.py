@@ -16,9 +16,9 @@ class SigmaRuleLocation:
     def __str__(self):
         s = str(self.path.resolve())
         if self.line is not None:
-            s += ":" + str(self.line)
+            s += f":{str(self.line)}"
             if self.char is not None:
-                s += ":" + str(self.char)
+                s += f":{str(self.char)}"
         return s
 
 class SigmaError(ValueError):
@@ -33,7 +33,7 @@ class SigmaError(ValueError):
 
     def __str__(self):
         if self.source is not None:
-            return super().__str__() + " in " + str(self.source)
+            return f"{super().__str__()} in {str(self.source)}"
         else:
             return super().__str__()
 

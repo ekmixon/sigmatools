@@ -275,7 +275,7 @@ def test_bool_invalid():
         SigmaBool(123)
 
 def test_null_to_plain():
-    assert SigmaNull().to_plain() == None
+    assert SigmaNull().to_plain() is None
 
 def test_null_equality():
     assert SigmaNull() == SigmaNull("foo")

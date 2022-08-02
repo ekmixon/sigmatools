@@ -25,19 +25,16 @@ def test_single_rule():
 def test_merge():
     rules = [
         {
-            "title": "Test " + i,
-            "logsource": {
-                "category": "test"
-            },
+            "title": f"Test {i}",
+            "logsource": {"category": "test"},
             "detection": {
-                "test": {
-                    "field" + i: "value" + i
-                },
+                "test": {f"field{i}": f"value{i}"},
                 "condition": "test",
-            }
+            },
         }
         for i in ["1", "2"]
     ]
+
 
     assert SigmaCollection.merge([
         SigmaCollection.from_dicts([ rules[0] ]),
@@ -237,19 +234,17 @@ def test_load_ruleset_nolist():
 
 def test_load_ruleset_onbeforeload():
     def onbeforeload(p):
-        if "2" in str(p):
-            return None
-        else:
-            return p
+        return None if "2" in str(p) else p
+
     assert len(SigmaCollection.load_ruleset([ "tests/files/ruleset" ], on_beforeload=onbeforeload).rules) == 1
 
 def test_load_ruleset_onload():
     def onload(p, sc):
         if "2" in str(p):
             return None
-        else:
-            sc.rules[0].title = "changed"
-            return sc
+        sc.rules[0].title = "changed"
+        return sc
+
     sigma_collection = SigmaCollection.load_ruleset([ "tests/files/ruleset" ], on_load=onload)
     assert len(sigma_collection.rules) == 1 and sigma_collection.rules[0].title == "changed"
 

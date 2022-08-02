@@ -143,13 +143,13 @@ def test_field_mapping_tracking(field_mapping_transformation_sigma_rule):
         detection_item.field: detection_item.was_processed_by("test")
         for detection_item in detection_items
         if isinstance(detection_item, SigmaDetectionItem)
-    }
-    updated_detection_items.update({
+    } | {
         detection_item.field: detection_item.was_processed_by("test")
         for detection in detection_items
         if isinstance(detection, SigmaDetection)
         for detection_item in detection.detection_items
-    })
+    }
+
     assert (
         updated_detection_items == {
             "fieldA": True,

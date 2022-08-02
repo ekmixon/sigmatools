@@ -83,10 +83,10 @@ class RuleContainsDetectionItemCondition(RuleProcessingCondition):
         self.sigma_value = sigma_type(self.value)
 
     def match(self, pipeline : "sigma.processing.pipeline.ProcessingPipeline", rule : SigmaRule) -> bool:
-        for detection in rule.detection.detections.values():
-            if self.find_detection_item(detection):
-                return True
-        return False
+        return any(
+            self.find_detection_item(detection)
+            for detection in rule.detection.detections.values()
+        )
 
     def find_detection_item(self, detection : Union[SigmaDetectionItem, SigmaDetection]) -> bool:
         if isinstance(detection, SigmaDetection):
@@ -175,15 +175,8 @@ class MatchStringCondition(ValueProcessingCondition):
             raise SigmaRegularExpressionError(f"Regular expression '{self.pattern}' is invalid: {str(e)}") from e
 
     def match_value(self, pipeline: "sigma.processing.pipeline.ProcessingPipeline", value: SigmaType) -> bool:
-        if isinstance(value, SigmaString):
-            result = self.re.match(str(value))
-        else:
-            result = False
-
-        if self.negate:
-            return not result
-        else:
-            return result
+        result = self.re.match(str(value)) if isinstance(value, SigmaString) else False
+        return not result if self.negate else result
 
 @dataclass
 class DetectionItemProcessingItemAppliedCondition(DetectionItemProcessingCondition):

@@ -155,7 +155,7 @@ def processing_pipeline_vars():
 
 @pytest.fixture
 def dummy_processing_pipeline():
-    return ProcessingPipeline(items=[], vars=dict())
+    return ProcessingPipeline(items=[], vars={})
 
 def test_processingitem_fromdict(processing_item_dict, processing_item):
     assert ProcessingItem.from_dict(processing_item_dict) == processing_item

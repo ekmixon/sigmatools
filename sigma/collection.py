@@ -37,9 +37,9 @@ class SigmaCollection:
         in the errors property individually for each Sigma rule and the whole SigmaCollection.
         """
         errors = []
-        parsed_rules = list()
+        parsed_rules = []
         prev_rule = None
-        global_rule = dict()
+        global_rule = {}
 
         for i, rule in zip(range(1, len(rules) + 1), rules):
             if isinstance(rule, SigmaRule):     # Included rules are already parsed, skip collection action processing
@@ -55,7 +55,7 @@ class SigmaCollection:
                     global_rule = rule
                     prev_rule = global_rule
                 elif action == "reset":     # remove global rule
-                    global_rule = dict()
+                    global_rule = {}
                 elif action == "repeat":    # add content of current rule to previous rule and parse it
                     prev_rule = deep_dict_update(prev_rule, rule)
                     parsed_rules.append(SigmaRule.from_dict(prev_rule, collect_errors, source))
@@ -141,7 +141,7 @@ class SigmaCollection:
             raise TypeError("Parameter 'inputs' must be list of strings or pathlib.Path objects, not " + str(type(inputs)))
 
         paths = cls.resolve_paths(inputs, recursion_pattern)
-        sigma_collections = list()
+        sigma_collections = []
         for path in paths:
             if on_beforeload is not None:       # replace path with return value of on_beforeload function if provided
                 path = on_beforeload(path)
@@ -171,15 +171,9 @@ class SigmaCollection:
         return len(self.rules)
 
     def __getitem__(self, i : Union[int, str]):
-        if isinstance(i, int):
-            return self.rules[i]
-        else:
-            return self.ids_to_rules[i]
+        return self.rules[i] if isinstance(i, int) else self.ids_to_rules[i]
 
 def deep_dict_update(dest, src):
     for k, v in src.items():
-        if isinstance(v, dict):
-            dest[k] = deep_dict_update(dest.get(k, {}), v)
-        else:
-            dest[k] = v
+        dest[k] = deep_dict_update(dest.get(k, {}), v) if isinstance(v, dict) else v
     return dest

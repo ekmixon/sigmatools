@@ -28,22 +28,11 @@ class ProcessingItem:
     def from_dict(cls, d : dict):
         """Instantiate processing item from parsed definition and variables."""
         # Identifier
-        identifier = d.get("id", None)
+        identifier = d.get("id")
 
         # Rule and detection item conditions
         # Do the same initialization for rule and detection item conditions
-        for condition_class_mapping, cond_defs, conds in (
-            (                                       # Condition item processing items are defined as follows:
-                rule_conditions,                    # Dict containing mapping between names used in configuration and classes.
-                d.get("rule_conditions", list()),   # List of conditions in configuration dict
-                rule_conds := list(),               # List where condition classes for ProcessingItem initialization are collected
-            ),
-            (
-                detection_item_conditions,
-                d.get("detection_item_conditions", list()),
-                detection_item_conds := list()
-            ),
-        ):
+        for condition_class_mapping, cond_defs, conds in ((rule_conditions, d.get("rule_conditions", []), rule_conds := []), (detection_item_conditions, d.get("detection_item_conditions", []), detection_item_conds := [])):
             for i, cond_def in enumerate(cond_defs):
                 try:
                     cond_type = cond_def["type"]
@@ -94,7 +83,7 @@ class ProcessingItem:
         try:
             transformation = transformation_class(**params)
         except (SigmaConfigurationError, TypeError) as e:
-            raise SigmaConfigurationError("Error in transformation: " + str(e)) from e
+            raise SigmaConfigurationError(f"Error in transformation: {str(e)}") from e
 
         return cls(transformation, rule_condition_linking, rule_condition_negation, rule_conds, detection_item_condition_linking, detection_item_condition_negation, detection_item_conds, identifier)
 
@@ -156,23 +145,23 @@ class ProcessingPipeline:
     def __post_init__(self):
         if not all((isinstance(item, ProcessingItem) for item in self.items)):
             raise TypeError("Each item in a processing pipeline must be a ProcessingItem - don't use processing classes directly!")
-        self.applied = list()
+        self.applied = []
         self.applied_ids = set()
-        self.state = dict()
+        self.state = {}
 
     @classmethod
     def from_dict(cls, d : dict) -> "ProcessingPipeline":
         """Instantiate processing pipeline from a parsed processing item description."""
-        vars = d.get("vars", dict())        # default: no variables
-        items = d.get("transformations", list())      # default: no transformation
-        processing_items = list()
+        vars = d.get("vars", {})
+        items = d.get("transformations", [])
+        processing_items = []
         for i, item in enumerate(items):
             try:
                 processing_items.append(ProcessingItem.from_dict(item))
             except SigmaConfigurationError as e:
                 raise SigmaConfigurationError(f"Error in processing rule { i + 1 }: { str(e) }") from e
         priority = d.get("priority", 0)
-        name = d.get("name", None)
+        name = d.get("name")
 
         return cls(processing_items, vars, priority, name)
 
@@ -184,9 +173,9 @@ class ProcessingPipeline:
 
     def apply(self, rule : SigmaRule) -> SigmaRule:
         """Apply processing pipeline on Sigma rule."""
-        self.applied = list()
+        self.applied = []
         self.applied_ids = set()
-        self.state = dict()
+        self.state = {}
         for item in self.items:
             applied = item.apply(self, rule)
             self.applied.append(applied)
@@ -207,7 +196,4 @@ class ProcessingPipeline:
 
     def __radd__(self, other : Literal[0]) -> "ProcessingPipeline":
         """Ignore integer 0 on addition to make sum of list of ProcessingPipelines working."""
-        if other == 0:
-            return self
-        else:
-            return NotImplemented
+        return self if other == 0 else NotImplemented

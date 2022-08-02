@@ -63,17 +63,11 @@ class ConditionItem(ParentChainMixin, ABC):
     def from_parsed(cls, s : str, l : int, t : Union[ParseResults, list]) -> "ConditionItem":
         """Create condition object from parse result"""
         if cls.arg_count == 1:
-            if cls.token_list:
-                args = [ t[0] ]
-            else:
-                args = [ t[0][-1] ]
+            args = [ t[0] ] if cls.token_list else [ t[0][-1] ]
         elif cls.arg_count > 1:
-            if cls.token_list:
-                args = t[0::2]
-            else:
-                args = t[0][0::2]
-        else:                   # pragma: no cover
-            args = list()       # this case can only happen if broken classes are defined
+            args = t[::2] if cls.token_list else t[0][::2]
+        else:           # pragma: no cover
+            args = []
         return [cls(args)]
 
     def postprocess(self, detections : "sigma.rule.SigmaDetections", parent : Optional["ConditionItem"] = None, source : Optional[SigmaRuleLocation] = None) -> "ConditionItem":
@@ -94,10 +88,7 @@ class ConditionItem(ParentChainMixin, ABC):
                 self.args
             )
         )
-        if self.arg_count > 1 and len(self.args) == 1:  # multi-argument condition (AND, OR) has only one argument left: return the single argument
-            return self.args[0]
-        else:
-            return self
+        return self.args[0] if self.arg_count > 1 and len(self.args) == 1 else self
 
 @dataclass
 class ConditionOR(ConditionItem):
@@ -140,10 +131,7 @@ class ConditionSelector(ConditionItem):
     pattern : str = field(init=False)
 
     def __post_init__(self):
-        if self.args[0] in ["1", "any"]:
-            self.cond_class = ConditionOR
-        else:
-            self.cond_class = ConditionAND
+        self.cond_class = ConditionOR if self.args[0] in ["1", "any"] else ConditionAND
         self.pattern = self.args[1]
 
     def postprocess(self, detections : "sigma.rule.SigmaDetections", parent : Optional["ConditionItem"] = None, source : Optional[SigmaRuleLocation] = None) -> Union[ConditionAND, ConditionOR]:
@@ -174,11 +162,11 @@ class ConditionValueExpression(ParentChainMixin):
     """Match on value without field"""
     value : SigmaType
 
-identifier = Word(alphanums + "_-")
+identifier = Word(f"{alphanums}_-")
 identifier.setParseAction(ConditionIdentifier.from_parsed)
 
 quantifier = Keyword("1") | Keyword("any") | Keyword("all")
-identifier_pattern = Word(alphanums + "*_")
+identifier_pattern = Word(f"{alphanums}*_")
 selector = quantifier + Keyword("of") + identifier_pattern
 selector.setParseAction(ConditionSelector.from_parsed)
 

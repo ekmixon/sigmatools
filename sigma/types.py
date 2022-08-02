@@ -75,26 +75,22 @@ class SigmaString(SigmaType):
 
         self.original = s
 
-        r = list()
+        r = []
         acc = ""            # string accumulation until special character appears
         escaped = False     # escape mode flag: characters in this mode are always accumulated
         for c in s:
-            if escaped:                 # escaping mode?
-                if c in char_mapping or c == escape_char:   # accumulate if character is special or escaping character
-                    acc += c
-                else:                   # accumulate escaping and current character (this allows to use plain backslashes in values)
-                    acc += escape_char + c
+            if escaped:     # escaping mode?
+                acc += c if c in char_mapping or c == escape_char else escape_char + c
                 escaped = False
             elif c == escape_char:      # escaping character? enable escaped mode for next character
                 escaped = True
-            else:                       # "normal" string parsing
-                if c in char_mapping:   # character is special character?
-                    if acc != "":
-                        r.append(acc)  # append accumulated string to parsed result if there was something
-                    r.append(char_mapping[c])      # append special character to parsed result
-                    acc = ""            # accumulation reset
-                else:                   # characters without special meaning aren't accumulated
-                    acc += c
+            elif c in char_mapping:   # character is special character?
+                if acc != "":
+                    r.append(acc)  # append accumulated string to parsed result if there was something
+                r.append(char_mapping[c])      # append special character to parsed result
+                acc = ""            # accumulation reset
+            else:                   # characters without special meaning aren't accumulated
+                acc += c
         if escaped:                     # String ended in escaping mode: accumulate escaping character
             acc += escape_char
         if acc != "":                   # append accumulated remainder
@@ -179,12 +175,11 @@ class SigmaString(SigmaType):
 
             i += 1
 
-        if len(result) == 0:   # Special case: start begins after string - return empty string
+        if not result:
             return SigmaString("")
-        else:                       # Return calculated result
-            s = SigmaString()
-            s.s = tuple(result)
-            return s
+        s = SigmaString()
+        s.s = tuple(result)
+        return s
 
     def insert_placeholders(self) -> "SigmaString":
         """
@@ -336,10 +331,7 @@ class SigmaString(SigmaType):
 
     def contains_special(self) -> bool:
         """Check if string contains special characters."""
-        return any([
-            isinstance(item, SpecialChars)
-            for item in self.s
-        ])
+        return any(isinstance(item, SpecialChars) for item in self.s)
 
     def contains_placeholder(self, include : Optional[List[str]] = None, exclude : Optional[List[str]] = None) -> bool:
         """
@@ -390,8 +382,7 @@ class SigmaString(SigmaType):
     def __iter__(self) -> Iterable[Union[str, SpecialChars]]:
         for item in self.s:
             if isinstance(item, str):       # yield single characters of string parts
-                for char in item:
-                    yield char
+                yield from item
             else:
                 yield item
 
@@ -424,17 +415,16 @@ class SigmaString(SigmaType):
                 if c in escaped_chars:
                     s += escape_char
                 s += c
-            else:                       # special handling for special characters
-                if c == SpecialChars.WILDCARD_MULTI:
-                    if wildcard_multi is not None:
-                        s += wildcard_multi
-                    else:
-                        raise SigmaValueError("Multi-character wildcard not specified for conversion")
-                elif c == SpecialChars.WILDCARD_SINGLE:
-                    if wildcard_single is not None:
-                        s += wildcard_single
-                    else:
-                        raise SigmaValueError("Single-character wildcard not specified for conversion")
+            elif c == SpecialChars.WILDCARD_MULTI:
+                if wildcard_multi is None:
+                    raise SigmaValueError("Multi-character wildcard not specified for conversion")
+                else:
+                    s += wildcard_multi
+            elif c == SpecialChars.WILDCARD_SINGLE:
+                if wildcard_single is not None:
+                    s += wildcard_single
+                else:
+                    raise SigmaValueError("Single-character wildcard not specified for conversion")
         return s
 
 @dataclass
@@ -443,13 +433,10 @@ class SigmaNumber(SigmaType):
     number : Union[int, float]
 
     def __post_init__(self):
-        try:        # Only use float number if it can't be represented as int.
+        try:# Only use float number if it can't be represented as int.
             i = int(self.number)
             f = float(self.number)
-            if i == f:
-                self.number = i
-            else:
-                self.number = f
+            self.number = i if i == f else f
         except ValueError as e:
             raise SigmaValueError("Invalid number") from e
 
@@ -515,7 +502,9 @@ class SigmaCIDRExpression(NoPlainConversionMixin, SigmaType):
         try:
             self.network = IPv4Network(self.cidr)
         except ValueError as e:
-            raise SigmaTypeError("Invalid IPv4 CIDR expression: " + str(e), source=self.source)
+            raise SigmaTypeError(
+                f"Invalid IPv4 CIDR expression: {str(e)}", source=self.source
+            )
 
     def expand(
             self,
@@ -528,29 +517,27 @@ class SigmaCIDRExpression(NoPlainConversionMixin, SigmaType):
 
         Setting wildcard to None indicates that this feature is not need and the query language handles CIDR notation properly.
         """
-        if wildcard == None:
+        if wildcard is None:
             return [self.cidr]
-        else:
-            subnet = int (str(self.cidr).split('/')[1])
-            if subnet <= 8 :
-                new_sub = 8
-                remp_old = '0.0.0/8'
-                remp_new = wildcard
-            elif subnet <= 16:
-                new_sub = 16
-                remp_old = '0.0/16'
-                remp_new = wildcard
-            elif subnet <= 24:
-                new_sub = 24
-                remp_old = '0/24'
-                remp_new = wildcard
-            elif subnet <= 32:
-                new_sub = 32
-                remp_old = '/32'
-                remp_new = ''
-            subnets = self.network.subnets(new_prefix=new_sub)
-            wildcarded_subnets = [str(ip_sub).replace(remp_old, remp_new) for ip_sub in subnets]
-            return wildcarded_subnets
+        subnet = int (str(self.cidr).split('/')[1])
+        if subnet <= 8 :
+            new_sub = 8
+            remp_old = '0.0.0/8'
+            remp_new = wildcard
+        elif subnet <= 16:
+            new_sub = 16
+            remp_old = '0.0/16'
+            remp_new = wildcard
+        elif subnet <= 24:
+            new_sub = 24
+            remp_old = '0/24'
+            remp_new = wildcard
+        elif subnet <= 32:
+            new_sub = 32
+            remp_old = '/32'
+            remp_new = ''
+        subnets = self.network.subnets(new_prefix=new_sub)
+        return [str(ip_sub).replace(remp_old, remp_new) for ip_sub in subnets]
 
     def convert(
             self,

@@ -150,22 +150,21 @@ class Backend(ABC):
             return False
 
         # All argument values must be strings or numbers
-        if not all([
-            isinstance(arg.value, ( SigmaString, SigmaNumber ))
-            for arg in cond.args
-        ]):
-           return False
-
-        # Check for plain strings if wildcards are not allowed for string expressions.
-        if not self.in_expressions_allow_wildcards and any([
-            arg.value.contains_special()
-            for arg in cond.args
-            if isinstance(arg.value, SigmaString)
-        ]):
-           return False
-
-        # All checks passed, expression can be converted to in-expression
-        return True
+        return (
+            bool(
+                self.in_expressions_allow_wildcards
+                or not any(
+                    arg.value.contains_special()
+                    for arg in cond.args
+                    if isinstance(arg.value, SigmaString)
+                )
+            )
+            if all(
+                isinstance(arg.value, (SigmaString, SigmaNumber))
+                for arg in cond.args
+            )
+            else False
+        )
 
     @abstractmethod
     def convert_condition_as_in_expression(self, cond : Union[ConditionOR, ConditionAND], state : ConversionState) -> Any:
@@ -247,7 +246,9 @@ class Backend(ABC):
         elif isinstance(cond.value, SigmaExpansion):
             return self.convert_condition_field_eq_expansion(cond, state)
         else:       # pragma: no cover
-            raise TypeError("Unexpected value type class in condition parse tree: " + cond.value.__class__.__name__)
+            raise TypeError(
+                f"Unexpected value type class in condition parse tree: {cond.value.__class__.__name__}"
+            )
 
     @abstractmethod
     def convert_condition_val_str(self, cond : ConditionValueExpression, state : ConversionState) -> Any:
@@ -280,7 +281,9 @@ class Backend(ABC):
         elif isinstance(cond.value, SigmaQueryExpression):
             return self.convert_condition_query_expr(cond, state)
         else:       # pragma: no cover
-            raise TypeError("Unexpected value type class in condition parse tree: " + cond.value.__class__.__name__)
+            raise TypeError(
+                f"Unexpected value type class in condition parse tree: {cond.value.__class__.__name__}"
+            )
 
     def convert_condition(
         self,
@@ -312,7 +315,9 @@ class Backend(ABC):
         elif isinstance(cond, ConditionValueExpression):
             return self.convert_condition_val(cond, state)
         else:       # pragma: no cover
-            raise TypeError("Unexpected data type in condition parse tree: " + cond.__class__.__name__)
+            raise TypeError(
+                f"Unexpected data type in condition parse tree: {cond.__class__.__name__}"
+            )
 
     def finalize_query(self, rule : SigmaRule, query : Any, index : int, state : ConversionState, output_format : str):
         """
@@ -322,7 +327,9 @@ class Backend(ABC):
         This is the place where syntactic elements of the target format for the specific query are added,
         e.g. adding query metadata.
         """
-        return self.__getattribute__("finalize_query_" + output_format)(rule, query, index, state)
+        return self.__getattribute__(f"finalize_query_{output_format}")(
+            rule, query, index, state
+        )
 
     def finalize_query_default(self, rule : SigmaRule, query : Any, index : int, state : ConversionState) -> Any:
         """
@@ -333,7 +340,7 @@ class Backend(ABC):
 
     def finalize(self, queries : List[Any], output_format : str):
         """Finalize output. Dispatches to format-specific method."""
-        return self.__getattribute__("finalize_output_" + output_format)(queries)
+        return self.__getattribute__(f"finalize_output_{output_format}")(queries)
 
     def finalize_output_default(self, queries : List[Any]) -> Any:
         """
@@ -506,14 +513,15 @@ class TextQueryBackend(Backend):
         """Conversion of NOT conditions."""
         arg = cond.args[0]
         try:
-            if arg.__class__ in self.precedence:        # group if AND or OR condition is negated
+            if arg.__class__ in self.precedence:
                 return self.not_token + self.token_separator + self.convert_condition_group(arg, state)
-            else:
-                expr = self.convert_condition(arg, state)
-                if isinstance(expr, DeferredQueryExpression):      # negate deferred expression and pass it to parent
-                    return expr.negate()
-                else:                                             # convert negated expression to string
-                    return self.not_token + self.token_separator + expr
+            expr = self.convert_condition(arg, state)
+            return (
+                expr.negate()
+                if isinstance(expr, DeferredQueryExpression)
+                else self.not_token + self.token_separator + expr
+            )
+
         except TypeError:       # pragma: no cover
             raise NotImplementedError("Operator 'not' not supported by the backend")
 
@@ -528,7 +536,7 @@ class TextQueryBackend(Backend):
         result is negated, which is the default behavior. In this case the field name is quoted if
         the pattern doesn't matches.
         """
-        if self.field_escape is not None:               # field name escaping
+        if self.field_escape is not None:       # field name escaping
             if self.field_escape_pattern is not None:   # Match all occurrences of field_escpae_pattern if defined and initialize match position set with result.
                 match_positions = {
                     match.start()
@@ -544,14 +552,15 @@ class TextQueryBackend(Backend):
                     for match in re_quote.finditer(field_name)
                 ))
 
-            if len(match_positions) > 0:    # found matches, escape them
+            if match_positions:    # found matches, escape them
                 r = [0] + list(sorted(match_positions)) + [len(field_name)]
-                escaped_field_name = ""
-                for i in range(len(r) - 1):    # TODO: from Python 3.10 this can be replaced with itertools.pairwise(), but for now we keep support for Python <3.10
-                    if i == 0:          # The first range is passed to the result without escaping
-                        escaped_field_name += field_name[r[i]:r[i + 1]]
-                    else:               # Subsequent ranges are positions of matches and therefore are prepended with field_escape
-                        escaped_field_name += self.field_escape + field_name[r[i]:r[i + 1]]
+                escaped_field_name = "".join(
+                    field_name[r[i] : r[i + 1]]
+                    if i == 0
+                    else self.field_escape + field_name[r[i] : r[i + 1]]
+                    for i in range(len(r) - 1)
+                )
+
             else:                       # no matches, just pass original field name without escaping
                 escaped_field_name = field_name
         else:
@@ -656,29 +665,30 @@ class TextQueryBackend(Backend):
     def convert_condition_field_eq_val_cidr(self, cond : ConditionFieldEqualsValueExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
         """Conversion of field matches regular expression value expressions."""
         convert_str = self.convert_value_cidr(cond.value, state)
-        if self.or_token in convert_str:
-            list_ip = convert_str.split(self.or_token)
-            if self.cidr_wildcard == None:
-                    return self.cidr_in_list_expression.format(
-                        field=self.escape_and_quote_field(cond.field),
-                        list=self.list_separator.join([str(v) for v in list_ip])
-                    )
-            else:
-                return self.cidr_in_list_expression.format(
-                    field=self.escape_and_quote_field(cond.field),
-                    list=self.list_separator.join([ self.str_quote + str(v) + self.str_quote for v in list_ip])
-                )
-        else:
-            if self.cidr_wildcard == None:
-                return self.cidr_expression.format(
+        if self.or_token not in convert_str:
+            return (
+                self.cidr_expression.format(
                     field=self.escape_and_quote_field(cond.field),
                     value=convert_str,
                 )
-            else:
-                return self.cidr_expression.format(
+                if self.cidr_wildcard is None
+                else self.cidr_expression.format(
                     field=self.escape_and_quote_field(cond.field),
                     value=self.str_quote + convert_str + self.str_quote,
                 )
+            )
+
+        list_ip = convert_str.split(self.or_token)
+        if self.cidr_wildcard is None:
+            return self.cidr_in_list_expression.format(
+                field=self.escape_and_quote_field(cond.field),
+                list=self.list_separator.join([str(v) for v in list_ip])
+            )
+        else:
+            return self.cidr_in_list_expression.format(
+                field=self.escape_and_quote_field(cond.field),
+                list=self.list_separator.join([ self.str_quote + str(v) + self.str_quote for v in list_ip])
+            )
 
     def convert_condition_field_compare_op_val(self, cond : ConditionFieldEqualsValueExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
         """Conversion of numeric comparison operations into queries."""
@@ -717,16 +727,15 @@ class TextQueryBackend(Backend):
         Finalize query by appending deferred query parts to the main conversion result as specified
         with deferred_start and deferred_separator.
         """
-        if state.has_deferred():
-            if isinstance(query, DeferredQueryExpression):
-                query = self.deferred_only_query
-            return super().finalize_query(rule,
-                query + self.deferred_start + self.deferred_separator.join((
-                    deferred_expression.finalize_expression()
-                    for deferred_expression in state.deferred
-                    )
-                ),
-                index, state, output_format
-            )
-        else:
+        if not state.has_deferred():
             return super().finalize_query(rule, query, index, state, output_format)
+        if isinstance(query, DeferredQueryExpression):
+            query = self.deferred_only_query
+        return super().finalize_query(rule,
+            query + self.deferred_start + self.deferred_separator.join((
+                deferred_expression.finalize_expression()
+                for deferred_expression in state.deferred
+                )
+            ),
+            index, state, output_format
+        )
